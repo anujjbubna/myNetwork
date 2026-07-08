@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ContactTag {
+  FAMILY
+  FRIEND
+  ACQUAINTANCE
+  BUSINESS
+}
+
+model Person {
+  id                  String      @id @default(cuid())
+  fullName            String
+  tag                 ContactTag?
+  closeness           Int? // 1-5
+  whatTheyDo          String?
+  howWeMet            String?
+  location            String?
+  birthday            String?
+  links               String[]    @default([])
+  likes               String[]    @default([])
+  dislikes            String[]    @default([])
+  highlights          String[]    @default([])
+  relationshipSummary String?
+  snoozedUntil        DateTime?
+  lastInteractedAt    DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  interactions Interaction[]
+  knows        Person[]      @relation("PersonKnows")
+  knownBy      Person[]      @relation("PersonKnows")
+  nudges       Nudge[]
+}
+
+model Interaction {
+  id        String   @id @default(cuid())
+  date      DateTime @default(now())
+  rawText   String
+  summary   String
+  createdAt DateTime @default(now())
+
+  people Person[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      String // "user" | "assistant"
+  content   String
+  personIds String[] @default([]) // person cards shown with this message
+  createdAt DateTime @default(now())
+}
+
+model Nudge {
+  id        String   @id @default(cuid())
+  day       String // YYYY-MM-DD the nudge batch was generated for
+  text      String
+  personId  String?
+  person    Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  dismissed Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
