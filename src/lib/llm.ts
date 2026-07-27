@@ -17,15 +17,28 @@ export function anthropic(): Anthropic {
   return client;
 }
 
-/** Call Anthropic and record token usage + estimated cost for the user. */
+/** Call Anthropic and record full token usage + list-price cost for the user. */
 export async function trackedMessagesCreate(
   userId: string,
   purpose: LlmPurpose,
   params: MessageCreateParamsNonStreaming,
 ): Promise<Message> {
   const response = await anthropic().messages.create(params);
-  const inputTokens = response.usage?.input_tokens ?? 0;
-  const outputTokens = response.usage?.output_tokens ?? 0;
+  const usage = response.usage;
+  const inputTokens = usage?.input_tokens ?? 0;
+  const outputTokens = usage?.output_tokens ?? 0;
+  const cacheReadTokens = usage?.cache_read_input_tokens ?? 0;
+  let cacheCreation5mTokens = usage?.cache_creation?.ephemeral_5m_input_tokens ?? 0;
+  let cacheCreation1hTokens = usage?.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  const cacheCreationAggregate = usage?.cache_creation_input_tokens ?? 0;
+  if (
+    cacheCreation5mTokens === 0 &&
+    cacheCreation1hTokens === 0 &&
+    cacheCreationAggregate > 0
+  ) {
+    // Older-style aggregate: bill as 5m writes (most common TTL)
+    cacheCreation5mTokens = cacheCreationAggregate;
+  }
   const model = typeof params.model === "string" ? params.model : String(params.model);
 
   try {
@@ -36,7 +49,16 @@ export async function trackedMessagesCreate(
         purpose,
         inputTokens,
         outputTokens,
-        estimatedCostUsd: estimateCostUsd(model, inputTokens, outputTokens),
+        cacheReadTokens,
+        cacheCreation5mTokens,
+        cacheCreation1hTokens,
+        estimatedCostUsd: estimateCostUsd(model, {
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          cacheCreation5mTokens,
+          cacheCreation1hTokens,
+        }),
       },
     });
   } catch (err) {

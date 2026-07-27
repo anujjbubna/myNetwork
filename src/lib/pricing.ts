@@ -1,21 +1,55 @@
 /**
- * Estimated Anthropic list prices (USD per 1M tokens).
- * Used for admin dashboards — not a bill.
+ * Anthropic list prices (USD per 1M tokens) for per-user cost attribution.
+ * Uses the token counts returned on each Messages API response (including cache).
+ * This is the most accurate split possible on a shared API key — not a Console invoice.
  */
-const RATES: Record<string, { input: number; output: number }> = {
-  "claude-sonnet-4-5": { input: 3, output: 15 },
-  "claude-haiku-4-5": { input: 1, output: 5 },
-  "claude-sonnet-4-6": { input: 3, output: 15 },
-  "claude-opus-4-6": { input: 5, output: 25 },
+export type TokenUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheCreation5mTokens?: number;
+  cacheCreation1hTokens?: number;
 };
 
-const DEFAULT_RATE = { input: 3, output: 15 };
+type ModelRates = {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite5m: number;
+  cacheWrite1h: number;
+};
 
-export function estimateCostUsd(
-  model: string,
-  inputTokens: number,
-  outputTokens: number,
-): number {
+function ratesFromBase(input: number, output: number): ModelRates {
+  return {
+    input,
+    output,
+    cacheRead: input * 0.1,
+    cacheWrite5m: input * 1.25,
+    cacheWrite1h: input * 2,
+  };
+}
+
+const RATES: Record<string, ModelRates> = {
+  "claude-sonnet-4-5": ratesFromBase(3, 15),
+  "claude-sonnet-4-6": ratesFromBase(3, 15),
+  "claude-haiku-4-5": ratesFromBase(1, 5),
+  "claude-opus-4-5": ratesFromBase(5, 25),
+  "claude-opus-4-6": ratesFromBase(5, 25),
+};
+
+const DEFAULT_RATE = ratesFromBase(3, 15);
+
+function perMillion(tokens: number, usdPerMTok: number) {
+  return (tokens * usdPerMTok) / 1_000_000;
+}
+
+export function estimateCostUsd(model: string, usage: TokenUsage): number {
   const rate = RATES[model] ?? DEFAULT_RATE;
-  return (inputTokens * rate.input + outputTokens * rate.output) / 1_000_000;
+  return (
+    perMillion(usage.inputTokens, rate.input) +
+    perMillion(usage.outputTokens, rate.output) +
+    perMillion(usage.cacheReadTokens ?? 0, rate.cacheRead) +
+    perMillion(usage.cacheCreation5mTokens ?? 0, rate.cacheWrite5m) +
+    perMillion(usage.cacheCreation1hTokens ?? 0, rate.cacheWrite1h)
+  );
 }

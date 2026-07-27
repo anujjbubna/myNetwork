@@ -75,7 +75,7 @@ While consent is in **Testing**, add each invitee as a test user, or publish the
 
 Optional: `CHAT_MODEL`, `LIGHT_MODEL`.
 
-Admin **est. cost** = logged tokens × Anthropic list prices (not an invoice).
+Admin **est. cost** = token counts from each API response (input, output, cache read/write) × Anthropic list prices. Best per-account attribution on a shared key; not a Console invoice.
 
 ## Deploy (Vercel + Neon)
 

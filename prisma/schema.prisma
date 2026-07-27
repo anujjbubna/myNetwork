@@ -94,15 +94,18 @@ model Invite {
 }
 
 model LlmUsage {
-  id               String     @id @default(cuid())
-  userId           String
-  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  model            String
-  purpose          LlmPurpose
-  inputTokens      Int
-  outputTokens     Int
-  estimatedCostUsd Decimal    @db.Decimal(12, 6)
-  createdAt        DateTime   @default(now())
+  id                     String     @id @default(cuid())
+  userId                 String
+  user                   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model                  String
+  purpose                LlmPurpose
+  inputTokens            Int
+  outputTokens           Int
+  cacheReadTokens        Int        @default(0)
+  cacheCreation5mTokens  Int        @default(0)
+  cacheCreation1hTokens  Int        @default(0)
+  estimatedCostUsd       Decimal    @db.Decimal(12, 6)
+  createdAt              DateTime   @default(now())
 
   @@index([userId])
 }

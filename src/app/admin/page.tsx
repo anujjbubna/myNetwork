@@ -157,7 +157,8 @@ export default function AdminPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
           <p className="text-sm text-muted mt-1">
-            Usage metrics and invites. Spend is estimated from tokens × list prices.
+            Usage metrics and invites. Cost = actual API token counts × Anthropic list
+            prices (incl. cache). Best per-account split on a shared key — not a Console invoice.
           </p>
         </div>
         <button
@@ -221,7 +222,7 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 gap-3">
               <Stat label="Accounts (sum)" value={String(totals.accounts)} />
               <Stat label="Total LLM calls" value={String(totals.llmCalls)} />
-              <Stat label="Total est. cost" value={formatUsd(totals.estimatedSpendUsd)} />
+              <Stat label="Total est. cost (list price)" value={formatUsd(totals.estimatedSpendUsd)} />
               <Stat label="Profiles" value={String(totals.profiles)} />
             </div>
           )}
