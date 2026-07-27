@@ -14,8 +14,103 @@ enum ContactTag {
   BUSINESS
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum LlmPurpose {
+  chat
+  summary
+  nudge
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  people       Person[]
+  interactions Interaction[]
+  chatMessages ChatMessage[]
+  nudges       Nudge[]
+  llmUsages    LlmUsage[]
+  invitesCreated Invite[] @relation("InvitesCreated")
+  inviteUsed     Invite?  @relation("InviteUsed")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  createdById String?
+  createdBy   User?     @relation("InvitesCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  usedById    String?   @unique
+  usedBy      User?     @relation("InviteUsed", fields: [usedById], references: [id], onDelete: SetNull)
+  usedAt      DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model LlmUsage {
+  id               String     @id @default(cuid())
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model            String
+  purpose          LlmPurpose
+  inputTokens      Int
+  outputTokens     Int
+  estimatedCostUsd Decimal    @db.Decimal(12, 6)
+  createdAt        DateTime   @default(now())
+
+  @@index([userId])
+}
+
 model Person {
   id                  String      @id @default(cuid())
+  userId              String
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   fullName            String
   tag                 ContactTag?
   closeness           Int? // 1-5
@@ -37,32 +132,46 @@ model Person {
   knows        Person[]      @relation("PersonKnows")
   knownBy      Person[]      @relation("PersonKnows")
   nudges       Nudge[]
+
+  @@index([userId])
 }
 
 model Interaction {
   id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date      DateTime @default(now())
   rawText   String
   summary   String
   createdAt DateTime @default(now())
 
   people Person[]
+
+  @@index([userId])
 }
 
 model ChatMessage {
   id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   role      String // "user" | "assistant"
   content   String
   personIds String[] @default([]) // person cards shown with this message
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Nudge {
   id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   day       String // YYYY-MM-DD the nudge batch was generated for
   text      String
   personId  String?
   person    Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
   dismissed Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }

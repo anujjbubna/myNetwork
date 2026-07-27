@@ -5,24 +5,31 @@ import { prisma } from "@/lib/prisma";
 import { logInteraction } from "@/lib/interactions";
 import { toPersonCard } from "@/lib/serialize";
 import {
-  anthropic,
   hasApiKey,
   CHAT_MODEL,
   describePersonLine,
   describePersonFull,
   refreshRelationshipSummary,
 } from "@/lib/ai";
+import { trackedMessagesCreate } from "@/lib/llm";
 import type { Tag } from "@/lib/types";
+import { isSessionUser, requireUser } from "@/lib/session";
 
 export async function GET() {
+  const user = await requireUser();
+  if (!isSessionUser(user)) return user;
+
   const messages = await prisma.chatMessage.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
   messages.reverse();
 
   const allPersonIds = [...new Set(messages.flatMap((m) => m.personIds))];
-  const people = await prisma.person.findMany({ where: { id: { in: allPersonIds } } });
+  const people = await prisma.person.findMany({
+    where: { userId: user.id, id: { in: allPersonIds } },
+  });
   const byId = new Map(people.map((p) => [p.id, toPersonCard(p)]));
 
   return NextResponse.json(
@@ -37,7 +44,10 @@ export async function GET() {
 }
 
 export async function DELETE() {
-  await prisma.chatMessage.deleteMany();
+  const user = await requireUser();
+  if (!isSessionUser(user)) return user;
+
+  await prisma.chatMessage.deleteMany({ where: { userId: user.id } });
   return NextResponse.json({ ok: true });
 }
 
@@ -155,6 +165,7 @@ const TOOLS: Anthropic.Tool[] = [
 ];
 
 interface ToolContext {
+  userId: string;
   shownPersonIds: string[];
   touchedPersonIds: Set<string>;
   rawText: string;
@@ -165,10 +176,12 @@ async function runTool(
   input: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<string> {
+  const { userId } = ctx;
+
   switch (name) {
     case "get_person": {
-      const person = await prisma.person.findUnique({
-        where: { id: input.personId as string },
+      const person = await prisma.person.findFirst({
+        where: { id: input.personId as string, userId },
         include: {
           knows: { select: { fullName: true } },
           interactions: { orderBy: { date: "desc" }, take: 10 },
@@ -182,7 +195,7 @@ async function runTool(
     }
 
     case "search_people": {
-      const where: Record<string, unknown>[] = [];
+      const where: Record<string, unknown>[] = [{ userId }];
       if (typeof input.tag === "string" && VALID_TAGS.has(input.tag)) {
         where.push({ tag: input.tag });
       }
@@ -207,7 +220,7 @@ async function runTool(
         });
       }
       const people = await prisma.person.findMany({
-        where: where.length ? { AND: where } : undefined,
+        where: { AND: where },
         orderBy: [{ closeness: "desc" }, { fullName: "asc" }],
         take: 25,
       });
@@ -219,6 +232,7 @@ async function runTool(
       const keywords = (input.keywords as string[]).filter((k) => k.trim());
       const interactions = await prisma.interaction.findMany({
         where: {
+          userId,
           OR: keywords.flatMap((k) => [
             { summary: { contains: k, mode: "insensitive" as const } },
             { rawText: { contains: k, mode: "insensitive" as const } },
@@ -230,6 +244,7 @@ async function runTool(
       });
       const people = await prisma.person.findMany({
         where: {
+          userId,
           OR: keywords.flatMap((k) => [
             { likes: { hasSome: [k] } },
             { dislikes: { hasSome: [k] } },
@@ -268,22 +283,27 @@ async function runTool(
       const created: string[] = [];
       for (const p of peopleInput) {
         if (p.personId) {
-          const exists = await prisma.person.findUnique({ where: { id: p.personId } });
+          const exists = await prisma.person.findFirst({
+            where: { id: p.personId, userId },
+          });
           if (exists) {
             personIds.push(exists.id);
             continue;
           }
         }
         if (!p.name?.trim()) continue;
-        // Match by name (case-insensitive) before creating a duplicate
         const existing = await prisma.person.findFirst({
-          where: { fullName: { equals: p.name.trim(), mode: "insensitive" } },
+          where: {
+            userId,
+            fullName: { equals: p.name.trim(), mode: "insensitive" },
+          },
         });
         if (existing) {
           personIds.push(existing.id);
         } else {
           const newPerson = await prisma.person.create({
             data: {
+              userId,
               fullName: p.name.trim(),
               tag: p.tag && VALID_TAGS.has(p.tag) ? (p.tag as Tag) : null,
               closeness: p.closeness ?? null,
@@ -297,6 +317,7 @@ async function runTool(
 
       const date = input.date ? new Date(`${input.date}T12:00:00`) : new Date();
       const interaction = await logInteraction({
+        userId,
         personIds,
         date: isNaN(date.getTime()) ? new Date() : date,
         rawText: ctx.rawText,
@@ -313,8 +334,8 @@ async function runTool(
     }
 
     case "update_person": {
-      const person = await prisma.person.findUnique({
-        where: { id: input.personId as string },
+      const person = await prisma.person.findFirst({
+        where: { id: input.personId as string, userId },
       });
       if (!person) return "No person found with that id.";
 
@@ -338,11 +359,12 @@ async function runTool(
         data.highlights = appendUnique(person.highlights, input.addHighlights);
       if (input.addLinks) data.links = appendUnique(person.links, input.addLinks);
       if (input.knowsPersonIds) {
-        data.knows = {
-          connect: (input.knowsPersonIds as string[])
-            .filter((kid) => kid !== person.id)
-            .map((kid) => ({ id: kid })),
-        };
+        const knowsIds = (input.knowsPersonIds as string[]).filter((kid) => kid !== person.id);
+        const owned = await prisma.person.findMany({
+          where: { id: { in: knowsIds }, userId },
+          select: { id: true },
+        });
+        data.knows = { connect: owned.map((p) => ({ id: p.id })) };
       }
 
       await prisma.person.update({ where: { id: person.id }, data });
@@ -352,7 +374,9 @@ async function runTool(
 
     case "show_people": {
       const ids = input.personIds as string[];
-      const found = await prisma.person.findMany({ where: { id: { in: ids } } });
+      const found = await prisma.person.findMany({
+        where: { userId, id: { in: ids } },
+      });
       const foundIds = found.map((p) => p.id);
       ctx.shownPersonIds.push(...ids.filter((id) => foundIds.includes(id)));
       return `Will display cards for: ${found.map((p) => p.fullName).join(", ") || "(none found)"}.`;
@@ -364,18 +388,23 @@ async function runTool(
 }
 
 export async function POST(request: NextRequest) {
+  const user = await requireUser();
+  if (!isSessionUser(user)) return user;
+
   const { message } = await request.json();
   if (!message?.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
   const userText = message.trim();
-  await prisma.chatMessage.create({ data: { role: "user", content: userText } });
+  await prisma.chatMessage.create({
+    data: { userId: user.id, role: "user", content: userText },
+  });
 
   if (!hasApiKey()) {
     const reply =
       "I'm not connected to Claude yet - add your ANTHROPIC_API_KEY to the environment and restart, then I can log interactions and answer questions about your people.";
     const saved = await prisma.chatMessage.create({
-      data: { role: "assistant", content: reply },
+      data: { userId: user.id, role: "assistant", content: reply },
     });
     return NextResponse.json({
       id: saved.id,
@@ -387,8 +416,12 @@ export async function POST(request: NextRequest) {
   }
 
   const [allPeople, history] = await Promise.all([
-    prisma.person.findMany({ orderBy: { fullName: "asc" } }),
-    prisma.chatMessage.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
+    prisma.person.findMany({ where: { userId: user.id }, orderBy: { fullName: "asc" } }),
+    prisma.chatMessage.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
   ]);
   history.reverse();
 
@@ -417,6 +450,7 @@ Style: warm, concise, conversational. Plain text only - no markdown headers or b
   ];
 
   const ctx: ToolContext = {
+    userId: user.id,
     shownPersonIds: [],
     touchedPersonIds: new Set(),
     rawText: userText,
@@ -425,7 +459,7 @@ Style: warm, concise, conversational. Plain text only - no markdown headers or b
   let reply = "";
   try {
     for (let turn = 0; turn < 8; turn++) {
-      const response = await anthropic().messages.create({
+      const response = await trackedMessagesCreate(user.id, "chat", {
         model: CHAT_MODEL,
         max_tokens: 1500,
         system,
@@ -457,7 +491,7 @@ Style: warm, concise, conversational. Plain text only - no markdown headers or b
         results.push({ type: "tool_result", tool_use_id: tu.id, content: result });
       }
       messages.push({ role: "user", content: results });
-      reply = text; // keep last text in case loop exhausts
+      reply = text;
     }
   } catch (err) {
     console.error("Chat error:", err);
@@ -468,19 +502,26 @@ Style: warm, concise, conversational. Plain text only - no markdown headers or b
 
   const shownIds = [...new Set(ctx.shownPersonIds)].slice(0, 10);
   const saved = await prisma.chatMessage.create({
-    data: { role: "assistant", content: reply, personIds: shownIds },
+    data: {
+      userId: user.id,
+      role: "assistant",
+      content: reply,
+      personIds: shownIds,
+    },
   });
 
-  const shownPeople = await prisma.person.findMany({ where: { id: { in: shownIds } } });
+  const shownPeople = await prisma.person.findMany({
+    where: { userId: user.id, id: { in: shownIds } },
+  });
   const byId = new Map(shownPeople.map((p) => [p.id, toPersonCard(p)]));
 
-  // Refresh relationship summaries in the background after responding
   const touched = [...ctx.touchedPersonIds];
+  const uid = user.id;
   if (touched.length) {
     after(async () => {
       for (const id of touched) {
         try {
-          await refreshRelationshipSummary(id);
+          await refreshRelationshipSummary(id, uid);
         } catch (err) {
           console.error("Summary refresh failed for", id, err);
         }

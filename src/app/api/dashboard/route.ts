@@ -3,18 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { toPersonCard } from "@/lib/serialize";
 import { generateNudges, hasApiKey } from "@/lib/ai";
 import type { NudgeData } from "@/lib/types";
+import { isSessionUser, requireUser } from "@/lib/session";
 
 const RECONNECT_AFTER_DAYS = 30;
 
 export async function GET() {
+  const user = await requireUser();
+  if (!isSessionUser(user)) return user;
+
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const reconnectCutoff = new Date(now.getTime() - RECONNECT_AFTER_DAYS * 24 * 60 * 60 * 1000);
   const windowStart = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
 
-  // Top 5 most interacted: recency-weighted score over the last 180 days
   const recentInteractions = await prisma.interaction.findMany({
-    where: { date: { gte: windowStart } },
+    where: { userId: user.id, date: { gte: windowStart } },
     include: { people: { select: { id: true } } },
   });
   const scores = new Map<string, { score: number; count: number }>();
@@ -30,15 +33,17 @@ export async function GET() {
     .sort((a, b) => b[1].score - a[1].score)
     .slice(0, 5)
     .map(([id]) => id);
-  const topPeopleRaw = await prisma.person.findMany({ where: { id: { in: topIds } } });
+  const topPeopleRaw = await prisma.person.findMany({
+    where: { userId: user.id, id: { in: topIds } },
+  });
   const topPeople = topIds
     .map((id) => topPeopleRaw.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
     .map((p) => toPersonCard(p, { interactionCount: scores.get(p.id)?.count }));
 
-  // Reconnect: not snoozed, last interaction > cutoff (or never), oldest first
   const reconnectRaw = await prisma.person.findMany({
     where: {
+      userId: user.id,
       OR: [{ snoozedUntil: null }, { snoozedUntil: { lt: now } }],
       AND: {
         OR: [{ lastInteractedAt: null }, { lastInteractedAt: { lt: reconnectCutoff } }],
@@ -49,19 +54,20 @@ export async function GET() {
   });
   const reconnectPeople = reconnectRaw.map((p) => toPersonCard(p));
 
-  // Nudges: generate today's batch once, then serve non-dismissed
   if (hasApiKey()) {
-    const existingToday = await prisma.nudge.count({ where: { day: today } });
+    const existingToday = await prisma.nudge.count({
+      where: { userId: user.id, day: today },
+    });
     if (existingToday === 0) {
       try {
-        await generateNudges(today);
+        await generateNudges(today, user.id);
       } catch (err) {
         console.error("Nudge generation failed:", err);
       }
     }
   }
   const nudgesRaw = await prisma.nudge.findMany({
-    where: { day: today, dismissed: false },
+    where: { userId: user.id, day: today, dismissed: false },
     include: { person: { select: { id: true, fullName: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -72,7 +78,7 @@ export async function GET() {
     personName: n.person?.fullName ?? null,
   }));
 
-  const totalPeople = await prisma.person.count();
+  const totalPeople = await prisma.person.count({ where: { userId: user.id } });
 
   return NextResponse.json({ topPeople, reconnectPeople, nudges, totalPeople });
 }

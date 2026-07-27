@@ -1,20 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { TAG_LABELS } from "@/lib/types";
 import type { Person } from "@prisma/client";
+import { hasApiKey, LIGHT_MODEL, trackedMessagesCreate } from "@/lib/llm";
 
-export const CHAT_MODEL = process.env.CHAT_MODEL ?? "claude-sonnet-4-5";
-export const LIGHT_MODEL = process.env.LIGHT_MODEL ?? "claude-haiku-4-5";
-
-export function hasApiKey() {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
-}
-
-let client: Anthropic | null = null;
-export function anthropic(): Anthropic {
-  if (!client) client = new Anthropic();
-  return client;
-}
+export { CHAT_MODEL, LIGHT_MODEL, hasApiKey, anthropic } from "@/lib/llm";
 
 export function describePersonLine(p: Person): string {
   const parts = [
@@ -56,10 +45,10 @@ export function describePersonFull(
  * and recent interactions. Called after interactions are logged or profiles
  * updated via chat.
  */
-export async function refreshRelationshipSummary(personId: string) {
+export async function refreshRelationshipSummary(personId: string, userId: string) {
   if (!hasApiKey()) return;
-  const person = await prisma.person.findUnique({
-    where: { id: personId },
+  const person = await prisma.person.findFirst({
+    where: { id: personId, userId },
     include: {
       interactions: { orderBy: { date: "desc" }, take: 15 },
       knows: { select: { fullName: true } },
@@ -71,7 +60,7 @@ export async function refreshRelationshipSummary(personId: string) {
     .map((i) => `[${i.date.toISOString().slice(0, 10)}] ${i.summary}`)
     .join("\n");
 
-  const response = await anthropic().messages.create({
+  const response = await trackedMessagesCreate(userId, "summary", {
     model: LIGHT_MODEL,
     max_tokens: 400,
     system:
@@ -101,10 +90,11 @@ export async function refreshRelationshipSummary(personId: string) {
 }
 
 /** Generates today's proactive nudges (2-3) if not already generated. */
-export async function generateNudges(day: string) {
+export async function generateNudges(day: string, userId: string) {
   if (!hasApiKey()) return;
 
   const people = await prisma.person.findMany({
+    where: { userId },
     orderBy: { lastInteractedAt: "asc" },
   });
   if (people.length === 0) return;
@@ -116,7 +106,7 @@ export async function generateNudges(day: string) {
     })
     .join("\n");
 
-  const response = await anthropic().messages.create({
+  const response = await trackedMessagesCreate(userId, "nudge", {
     model: LIGHT_MODEL,
     max_tokens: 600,
     system:
@@ -150,6 +140,7 @@ export async function generateNudges(day: string) {
     .filter((n) => typeof n.text === "string" && n.text.trim())
     .slice(0, 3)
     .map((n) => ({
+      userId,
       day,
       text: n.text!.trim(),
       personId: n.personId && validIds.has(n.personId) ? n.personId : null,
