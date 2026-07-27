@@ -31,6 +31,19 @@ const tabs = [
       </svg>
     ),
   },
+  {
+    href: "/search",
+    label: "Search",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-6 h-6">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 21l-4.35-4.35M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export function BottomNav() {

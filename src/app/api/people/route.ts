@@ -2,14 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toPersonCard } from "@/lib/serialize";
 import { isSessionUser, requireUser } from "@/lib/session";
+import type { ContactTag } from "@prisma/client";
 
-export async function GET() {
+const VALID_TAGS = new Set(["FAMILY", "FRIEND", "ACQUAINTANCE", "BUSINESS"]);
+
+export async function GET(request: NextRequest) {
   const user = await requireUser();
   if (!isSessionUser(user)) return user;
 
+  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const tagParam = request.nextUrl.searchParams.get("tag")?.trim().toUpperCase() ?? "";
+  const tag = VALID_TAGS.has(tagParam) ? (tagParam as ContactTag) : null;
+
+  const where: Record<string, unknown> = { userId: user.id };
+  if (tag) where.tag = tag;
+  if (q) {
+    where.OR = [
+      { fullName: { contains: q, mode: "insensitive" } },
+      { whatTheyDo: { contains: q, mode: "insensitive" } },
+      { howWeMet: { contains: q, mode: "insensitive" } },
+      { location: { contains: q, mode: "insensitive" } },
+      { relationshipSummary: { contains: q, mode: "insensitive" } },
+      { likes: { hasSome: [q] } },
+      { dislikes: { hasSome: [q] } },
+      { highlights: { hasSome: [q] } },
+    ];
+  }
+
   const people = await prisma.person.findMany({
-    where: { userId: user.id },
-    orderBy: { fullName: "asc" },
+    where,
+    orderBy: [{ fullName: "asc" }],
     include: { _count: { select: { interactions: true } } },
   });
   return NextResponse.json(
