@@ -132,7 +132,12 @@ export default function AdminPage() {
   }
 
   async function copyLink(code: string) {
-    await navigator.clipboard.writeText(inviteUrl(code));
+    const message = [
+      "You have been invited to use myNetwork. Here is the link :)",
+      inviteUrl(code),
+      "Hope you like it!",
+    ].join("\n");
+    await navigator.clipboard.writeText(message);
     setCopied(code);
     setTimeout(() => setCopied(null), 2000);
   }
@@ -317,7 +322,7 @@ export default function AdminPage() {
                             onClick={() => copyLink(inv.code)}
                             className="text-xs font-medium text-accent"
                           >
-                            {copied === inv.code ? "Copied" : "Copy link"}
+                            {copied === inv.code ? "Copied" : "Copy invite"}
                           </button>
                           <button
                             type="button"
