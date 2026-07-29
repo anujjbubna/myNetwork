@@ -64,7 +64,8 @@ While consent is in **Testing**, add each invitee as a test user, or publish the
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | Postgres / Neon connection string |
+| `DATABASE_URL` | Neon **pooled** URL (host contains `-pooler`) — app runtime |
+| `DIRECT_URL` | Neon **direct** URL (no `-pooler`) — required for `prisma migrate` |
 | `AUTH_SECRET` | Auth.js + admin cookie signing secret |
 | `GOOGLE_CLIENT_ID` | Google OAuth web client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth web client secret |
@@ -80,11 +81,16 @@ Admin **est. cost** = token counts from each API response (input, output, cache 
 ## Deploy (Vercel + Neon)
 
 1. Push to GitHub
-2. Set the same env vars on Vercel (including `OWNER_EMAIL`, `ADMIN_ID`, `ADMIN_PASSWORD`)
-3. Remove old `APP_PIN` / `ADMIN_EMAIL` if present
-4. Deploy — build runs `prisma migrate deploy` + owner bootstrap
-5. Add production Google redirect URI
-6. Sign in at the app with Google (`OWNER_EMAIL`); open `/admin/login` for ops
+2. In Neon → **Connect**, copy **both**:
+   - **Pooled** → Vercel `DATABASE_URL`
+   - **Direct** → Vercel `DIRECT_URL` (host must **not** include `-pooler`)
+3. Set the other env vars on Vercel (`AUTH_SECRET`, Google, `OWNER_EMAIL`, `ADMIN_ID`, `ADMIN_PASSWORD`, `ANTHROPIC_API_KEY`)
+4. Remove old `APP_PIN` / `ADMIN_EMAIL` if present
+5. Deploy — build runs `prisma migrate deploy` + owner bootstrap
+6. Add production Google redirect URI
+7. Sign in at the app with Google (`OWNER_EMAIL`); open `/admin/login` for ops
+
+If deploy fails with Prisma **P1002** (advisory lock timeout), `DIRECT_URL` is missing or still pointing at the pooler.
 
 ## Project structure
 
