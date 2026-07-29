@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && tsx scripts/migrate-to-multiuser.ts && next build",
+    "build": "prisma generate && node scripts/migrate-deploy.mjs && tsx scripts/migrate-to-multiuser.ts && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "prisma migrate deploy && tsx scripts/migrate-to-multiuser.ts",
+    "db:migrate": "node scripts/migrate-deploy.mjs && tsx scripts/migrate-to-multiuser.ts",
     "db:migrate:dev": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:bootstrap-admin": "tsx scripts/migrate-to-multiuser.ts",
