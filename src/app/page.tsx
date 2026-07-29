@@ -43,6 +43,7 @@ export default function ChatPage() {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const baseTextRef = useRef("");
 
   useEffect(() => {
@@ -94,6 +95,7 @@ export default function ChatPage() {
     if (!content || sending) return;
     recognitionRef.current?.stop();
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     setSending(true);
     const optimistic: ChatMessageData = {
       id: `tmp-${crypto.randomUUID()}`,
@@ -214,17 +216,18 @@ export default function ChatPage() {
           className="flex items-end gap-2"
         >
           <textarea
+            ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
+            onChange={(e) => {
+              setInput(e.target.value);
+              const el = e.target;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
             }}
             rows={1}
+            enterKeyHint="enter"
             placeholder={listening ? "Listening..." : "Log an interaction or ask anything"}
-            className="flex-1 resize-none rounded-2xl border border-border bg-surface px-3.5 py-2.5 text-[15px] outline-none focus:border-accent max-h-32"
+            className="flex-1 resize-none rounded-2xl border border-border bg-surface px-3.5 py-2.5 text-[15px] outline-none focus:border-accent max-h-32 overflow-y-auto"
           />
           <button
             type="button"
