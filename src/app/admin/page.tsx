@@ -16,6 +16,8 @@ type AccountRow = {
 type Totals = {
   accounts: number;
   profiles: number;
+  weeklyActiveUsers: number;
+  monthlyActiveUsers: number;
   llmCalls: number;
   estimatedSpendUsd: number;
 };
@@ -187,7 +189,7 @@ export default function AdminPage() {
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       {tab === "metrics" && (
-        <section className="space-y-5">
+        <section className="space-y-6">
           <form onSubmit={applyFilter} className="flex gap-2">
             <input
               type="search"
@@ -224,15 +226,23 @@ export default function AdminPage() {
           )}
 
           {totals && (
-            <div className="grid grid-cols-1 gap-3">
+            <div className="flex flex-col">
               <Stat label="Accounts (sum)" value={String(totals.accounts)} />
               <Stat label="Total LLM calls" value={String(totals.llmCalls)} />
               <Stat label="Total est. cost (list price)" value={formatUsd(totals.estimatedSpendUsd)} />
               <Stat label="Profiles" value={String(totals.profiles)} />
+              <Stat
+                label="Weekly active users"
+                value={String(totals.weeklyActiveUsers ?? 0)}
+              />
+              <Stat
+                label="Monthly active users"
+                value={String(totals.monthlyActiveUsers ?? 0)}
+              />
             </div>
           )}
 
-          <div>
+          <div className="mt-8">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted mb-3">
               {appliedEmail ? "Matching accounts" : "All accounts"}
             </h2>
@@ -369,9 +379,9 @@ function TabButton({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-3 py-3">
+    <div className="rounded-xl border border-border bg-surface px-4 py-4 mb-4 last:mb-0">
       <div className="text-xs text-muted">{label}</div>
-      <div className="text-lg font-semibold tabular-nums mt-0.5">{value}</div>
+      <div className="text-lg font-semibold tabular-nums mt-1">{value}</div>
     </div>
   );
 }

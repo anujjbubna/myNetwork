@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession } from "@/lib/adminAuth";
+import { countActiveUsers } from "@/lib/activeUsers";
 import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
@@ -8,6 +9,9 @@ export async function GET(request: NextRequest) {
   if (admin !== true) return admin;
 
   const emailQ = request.nextUrl.searchParams.get("email")?.trim().toLowerCase() ?? "";
+  const now = Date.now();
+  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+  const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
   const users = await prisma.user.findMany({
     where: emailQ
@@ -19,6 +23,7 @@ export async function GET(request: NextRequest) {
       email: true,
       name: true,
       createdAt: true,
+      lastActiveAt: true,
       _count: { select: { people: true, llmUsages: true } },
     },
   });
@@ -43,11 +48,17 @@ export async function GET(request: NextRequest) {
     ]),
   );
 
+  const [weeklyActiveUsers, monthlyActiveUsers] = await Promise.all([
+    countActiveUsers(weekAgo, emailQ || undefined),
+    countActiveUsers(monthAgo, emailQ || undefined),
+  ]);
+
   const accounts = users.map((u) => ({
     id: u.id,
     email: u.email,
     name: u.name,
     createdAt: u.createdAt.toISOString(),
+    lastActiveAt: u.lastActiveAt?.toISOString() ?? null,
     profiles: u._count.people,
     llmCalls: spendMap.get(u.id)?.calls ?? u._count.llmUsages,
     estimatedSpendUsd: spendMap.get(u.id)?.spend ?? 0,
@@ -56,6 +67,8 @@ export async function GET(request: NextRequest) {
   const totals = {
     accounts: accounts.length,
     profiles: accounts.reduce((s, a) => s + a.profiles, 0),
+    weeklyActiveUsers,
+    monthlyActiveUsers,
     llmCalls: accounts.reduce((s, a) => s + a.llmCalls, 0),
     estimatedSpendUsd: accounts.reduce((s, a) => s + a.estimatedSpendUsd, 0),
   };
