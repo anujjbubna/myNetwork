@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useSyncExternalStore } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 
@@ -13,18 +13,35 @@ const ERROR_MESSAGES: Record<string, string> = {
   Default: "Something went wrong signing in. Try again.",
 };
 
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
+
 function LoginForm() {
   const router = useRouter();
   const { status } = useSession();
   const searchParams = useSearchParams();
-  const inviteFromUrl = searchParams.get("invite") ?? "";
-  const errorCode = searchParams.get("error") ?? "";
+  const isClient = useIsClient();
 
-  const [inviteCode, setInviteCode] = useState(inviteFromUrl);
+  const urlInvite = searchParams.get("invite") ?? "";
+  const urlError = searchParams.get("error") ?? "";
+
+  // null = "use URL after hydrate"; keeps SSR and first client paint identical ("")
+  const [inviteOverride, setInviteOverride] = useState<string | null>(null);
+  const [errorOverride, setErrorOverride] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(
-    errorCode ? ERROR_MESSAGES[errorCode] ?? ERROR_MESSAGES.Default : "",
-  );
+
+  const inviteCode = inviteOverride ?? (isClient ? urlInvite : "");
+  const error =
+    errorOverride !== null
+      ? errorOverride
+      : isClient && urlError
+        ? (ERROR_MESSAGES[urlError] ?? ERROR_MESSAGES.Default)
+        : "";
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -35,7 +52,7 @@ function LoginForm() {
   async function continueWithGoogle() {
     if (busy) return;
     setBusy(true);
-    setError("");
+    setErrorOverride("");
 
     const code = inviteCode.trim();
     if (code) {
@@ -45,7 +62,7 @@ function LoginForm() {
         body: JSON.stringify({ code }),
       });
       if (!res.ok) {
-        setError("Could not save invite code. Try again.");
+        setErrorOverride("Could not save invite code. Try again.");
         setBusy(false);
         return;
       }
@@ -72,7 +89,7 @@ function LoginForm() {
           <input
             type="text"
             value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
+            onChange={(e) => setInviteOverride(e.target.value)}
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
@@ -81,7 +98,7 @@ function LoginForm() {
           />
         </label>
 
-        {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+        {error ? <p className="text-sm text-red-500 text-center">{error}</p> : null}
 
         <button
           type="button"

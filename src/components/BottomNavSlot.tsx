@@ -1,13 +1,19 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useSyncExternalStore } from "react";
+import { BottomNav } from "@/components/BottomNav";
 
-const BottomNav = dynamic(
-  () => import("@/components/BottomNav").then((m) => m.BottomNav),
-  { ssr: false },
-);
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
 
-/** Loads BottomNav only on the client so usePathname can't mismatch SSR HTML. */
+/** Renders nav only after hydration so usePathname can't mismatch SSR HTML. */
 export function BottomNavSlot() {
+  const isClient = useIsClient();
+  if (!isClient) return null;
   return <BottomNav />;
 }

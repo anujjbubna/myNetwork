@@ -44,7 +44,6 @@ function formatUsd(n: number) {
 }
 
 function inviteUrl(code: string) {
-  if (typeof window === "undefined") return `/login?invite=${code}`;
   return `${window.location.origin}/login?invite=${code}`;
 }
 
@@ -152,21 +151,21 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <main className="flex-1 p-6">
+      <main className="p-6">
         <p className="text-sm text-muted">Loading admin…</p>
       </main>
     );
   }
 
   return (
-    <main className="flex-1 p-6 pb-10 space-y-6 max-w-lg mx-auto w-full">
+    <main className="p-6 pb-10 space-y-6 w-full">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
-          <p className="text-sm text-muted mt-1">
+          {/* <p className="text-sm text-muted mt-1">
             Usage metrics and invites. Cost = actual API token counts × Anthropic list
             prices (incl. cache). Best per-account split on a shared key — not a Console invoice.
-          </p>
+          </p> */}
         </div>
         <button
           type="button"
@@ -321,7 +320,7 @@ export default function AdminPage() {
                           ? `Used by ${inv.usedByEmail ?? inv.usedByName ?? "someone"}`
                           : "Unused"}
                         {" · "}
-                        created {new Date(inv.createdAt).toLocaleDateString()}
+                        created {new Date(inv.createdAt).toLocaleDateString("en-US")}
                       </p>
                     </div>
                     <div className="flex gap-2 shrink-0">

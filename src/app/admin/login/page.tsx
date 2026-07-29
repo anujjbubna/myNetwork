@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-center gap-6 p-6">
+    <main className="min-h-full flex flex-col items-center justify-center gap-6 p-6">
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
         <p className="text-sm text-muted mt-1">Metrics and invites only</p>

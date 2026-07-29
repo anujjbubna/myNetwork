@@ -4,6 +4,7 @@ import "./globals.css";
 import { BottomNavSlot } from "@/components/BottomNavSlot";
 import { SWRegister } from "@/components/SWRegister";
 import { AuthProvider } from "@/components/AuthProvider";
+import { auth } from "@/lib/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,11 +42,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html
       lang="en"
@@ -53,7 +56,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="h-dvh overflow-hidden flex flex-col" suppressHydrationWarning>
-        <AuthProvider>
+        <AuthProvider session={session}>
           <SWRegister />
           <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto overflow-hidden">
             {children}
