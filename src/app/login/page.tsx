@@ -32,10 +32,6 @@ function LoginForm() {
     }
   }, [status, router]);
 
-  useEffect(() => {
-    if (inviteFromUrl) setInviteCode(inviteFromUrl);
-  }, [inviteFromUrl]);
-
   async function continueWithGoogle() {
     if (busy) return;
     setBusy(true);
@@ -90,7 +86,7 @@ function LoginForm() {
         <button
           type="button"
           onClick={continueWithGoogle}
-          disabled={busy || status === "loading"}
+          disabled={busy}
           className="w-full rounded-xl bg-accent text-accent-fg font-semibold py-3 disabled:opacity-50 active:scale-[0.98] transition flex items-center justify-center gap-2"
         >
           <GoogleIcon />

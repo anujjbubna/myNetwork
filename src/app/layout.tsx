@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNavSlot } from "@/components/BottomNavSlot";
 import { SWRegister } from "@/components/SWRegister";
 import { AuthProvider } from "@/components/AuthProvider";
 
@@ -50,12 +50,15 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="h-dvh overflow-hidden flex flex-col" suppressHydrationWarning>
         <AuthProvider>
           <SWRegister />
-          <div className="flex-1 flex flex-col w-full max-w-lg mx-auto">{children}</div>
-          <BottomNav />
+          <div className="flex-1 min-h-0 flex flex-col w-full max-w-lg mx-auto overflow-hidden">
+            {children}
+          </div>
+          <BottomNavSlot />
         </AuthProvider>
       </body>
     </html>

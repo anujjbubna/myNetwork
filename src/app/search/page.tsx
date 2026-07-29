@@ -47,19 +47,17 @@ export default function SearchPage() {
   }, [debouncedQuery, tag]);
 
   return (
-    <main className="flex-1 flex flex-col gap-4 p-4 pb-8">
-      <header className="pt-2">
-        <h1 className="text-2xl font-bold">Search</h1>
-        <p className="text-sm text-muted mt-0.5">Find people in your network</p>
-      </header>
-
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur space-y-3">
+    <main className="flex-1 min-h-0 flex flex-col">
+      <div className="shrink-0 bg-background border-b border-border px-4 pt-2 pb-3 space-y-3">
+        <header>
+          <h1 className="text-2xl font-bold">Search</h1>
+          <p className="text-sm text-muted mt-0.5">Find people in your network</p>
+        </header>
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Name, job, place, likes…"
-          autoFocus
           className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base outline-none focus:border-accent"
         />
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
@@ -83,40 +81,42 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {error && (
-        <p className="text-sm text-red-500">Couldn&apos;t load people. Try again.</p>
-      )}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-8 flex flex-col gap-4">
+        {error && (
+          <p className="text-sm text-red-500">Couldn&apos;t load people. Try again.</p>
+        )}
 
-      {loading && people.length === 0 && (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-14 rounded-xl bg-surface-2 animate-pulse" />
-          ))}
-        </div>
-      )}
+        {loading && people.length === 0 && (
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-14 rounded-xl bg-surface-2 animate-pulse" />
+            ))}
+          </div>
+        )}
 
-      {!loading && !error && people.length === 0 && (
-        <div className="rounded-2xl border border-border bg-surface p-6 text-center">
-          <p className="font-medium">No matches</p>
-          <p className="text-sm text-muted mt-1">
-            {debouncedQuery || tag !== "ALL"
-              ? "Try a different name, keyword, or tag."
-              : "Your network is empty — add people through chat."}
-          </p>
-        </div>
-      )}
+        {!loading && !error && people.length === 0 && (
+          <div className="rounded-2xl border border-border bg-surface p-6 text-center">
+            <p className="font-medium">No matches</p>
+            <p className="text-sm text-muted mt-1">
+              {debouncedQuery || tag !== "ALL"
+                ? "Try a different name, keyword, or tag."
+                : "Your network is empty — add people through chat."}
+            </p>
+          </div>
+        )}
 
-      {people.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted">
-            {people.length} {people.length === 1 ? "person" : "people"}
-            {loading ? " · updating…" : ""}
-          </p>
-          {people.map((person) => (
-            <ChatPersonCard key={person.id} person={person} />
-          ))}
-        </div>
-      )}
+        {people.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted">
+              {people.length} {people.length === 1 ? "person" : "people"}
+              {loading ? " · updating…" : ""}
+            </p>
+            {people.map((person) => (
+              <ChatPersonCard key={person.id} person={person} />
+            ))}
+          </div>
+        )}
+      </div>
     </main>
   );
 }

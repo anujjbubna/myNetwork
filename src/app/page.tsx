@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatPersonCard } from "@/components/PersonCard";
 import type { ChatMessageData } from "@/lib/types";
 
@@ -41,11 +41,6 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
-  const speechSupported = useSyncExternalStore(
-    () => () => {},
-    () => Boolean(getSpeechRecognition()),
-    () => false,
-  );
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const baseTextRef = useRef("");
@@ -135,12 +130,12 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col">
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
+    <main className="flex-1 min-h-0 flex flex-col">
+      <header className="shrink-0 z-30 bg-background border-b border-border px-4 py-3">
         <h1 className="text-lg font-bold">myNetwork</h1>
       </header>
 
-      <div className="flex-1 flex flex-col gap-3 p-4 overflow-y-auto">
+      <div className="flex-1 min-h-0 flex flex-col gap-3 p-4 overflow-y-auto">
         {messages === null && (
           <div className="flex flex-col gap-3">
             {[0, 1, 2].map((i) => (
@@ -210,7 +205,7 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="sticky bottom-[57px] z-30 border-t border-border bg-background/95 backdrop-blur p-3">
+      <div className="shrink-0 z-30 border-t border-border bg-background p-3">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -230,28 +225,25 @@ export default function ChatPage() {
             rows={1}
             placeholder={listening ? "Listening..." : "Log an interaction or ask anything"}
             className="flex-1 resize-none rounded-2xl border border-border bg-surface px-3.5 py-2.5 text-[15px] outline-none focus:border-accent max-h-32"
-            style={{ fieldSizing: "content" } as React.CSSProperties}
           />
-          {speechSupported && (
-            <button
-              type="button"
-              onClick={toggleMic}
-              aria-label={listening ? "Stop listening" : "Speak"}
-              className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border transition ${
-                listening
-                  ? "bg-red-500 border-red-500 text-white animate-pulse"
-                  : "bg-surface border-border text-muted hover:text-foreground"
-              }`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm6-3a6 6 0 0 1-12 0m6 6v3"
-                />
-              </svg>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={toggleMic}
+            aria-label={listening ? "Stop listening" : "Speak"}
+            className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center border transition ${
+              listening
+                ? "bg-red-500 border-red-500 text-white animate-pulse"
+                : "bg-surface border-border text-muted hover:text-foreground"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm6-3a6 6 0 0 1-12 0m6 6v3"
+              />
+            </svg>
+          </button>
           <button
             type="submit"
             disabled={!input.trim() || sending}

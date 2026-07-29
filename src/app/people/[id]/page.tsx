@@ -38,7 +38,7 @@ export default function PersonPage({ params }: { params: Promise<{ id: string }>
 
   if (notFound) {
     return (
-      <main className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+      <main className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 p-6">
         <p className="text-muted">Person not found.</p>
         <Link href="/dashboard" className="text-accent font-medium text-sm">
           Back to dashboard
@@ -49,7 +49,7 @@ export default function PersonPage({ params }: { params: Promise<{ id: string }>
 
   if (!person) {
     return (
-      <main className="flex-1 p-4 flex flex-col gap-4">
+      <main className="flex-1 min-h-0 p-4 flex flex-col gap-4">
         <div className="h-24 rounded-2xl bg-surface-2 animate-pulse mt-10" />
         <div className="h-40 rounded-2xl bg-surface-2 animate-pulse" />
       </main>
@@ -57,67 +57,75 @@ export default function PersonPage({ params }: { params: Promise<{ id: string }>
   }
 
   return (
-    <main className="flex-1 flex flex-col p-4 pb-8 gap-5">
-      <header className="flex items-center justify-between pt-2">
-        <button
-          onClick={() => router.back()}
-          aria-label="Back"
-          className="p-2 -ml-2 text-muted hover:text-foreground"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <button
-          onClick={() => setEditing(!editing)}
-          className="text-sm font-medium text-accent px-2 py-1"
-        >
-          {editing ? "Cancel" : "Edit"}
-        </button>
-      </header>
+    <main className="flex-1 min-h-0 flex flex-col">
+      <div className="shrink-0 bg-background border-b border-border px-4 pt-2 pb-4 flex flex-col gap-4">
+        <header className="flex items-center justify-between">
+          <button
+            onClick={() => router.back()}
+            aria-label="Back"
+            className="p-2 -ml-2 text-muted hover:text-foreground"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setEditing(!editing)}
+            className="text-sm font-medium text-accent px-2 py-1"
+          >
+            {editing ? "Cancel" : "Edit"}
+          </button>
+        </header>
 
-      {editing ? (
-        <EditForm
-          person={person}
-          onSaved={(p) => {
-            setPerson(p);
-            setEditing(false);
-          }}
-          onDelete={remove}
-        />
-      ) : (
-        <ProfileView person={person} />
-      )}
+        {!editing && (
+          <>
+            <section className="flex items-center gap-4">
+              <Avatar name={person.fullName} size="lg" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold leading-tight">{person.fullName}</h1>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <TagBadge tag={person.tag} />
+                  <ClosenessDots value={person.closeness} />
+                </div>
+                <p className="text-xs text-muted mt-1">
+                  Last interaction {timeAgo(person.lastInteractedAt)}
+                </p>
+              </div>
+            </section>
+
+            {person.relationshipSummary && (
+              <section className="rounded-2xl bg-accent-soft p-4">
+                <h2 className="text-xs font-semibold text-accent uppercase tracking-wide mb-1.5">
+                  Relationship
+                </h2>
+                <p className="text-sm leading-relaxed line-clamp-4">{person.relationshipSummary}</p>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-8">
+        {editing ? (
+          <EditForm
+            person={person}
+            onSaved={(p) => {
+              setPerson(p);
+              setEditing(false);
+            }}
+            onDelete={remove}
+          />
+        ) : (
+          <ProfileView person={person} />
+        )}
+      </div>
     </main>
   );
 }
 
 function ProfileView({ person }: { person: PersonFull }) {
   return (
-    <>
-      <section className="flex items-center gap-4">
-        <Avatar name={person.fullName} size="lg" />
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold leading-tight">{person.fullName}</h1>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <TagBadge tag={person.tag} />
-            <ClosenessDots value={person.closeness} />
-          </div>
-          <p className="text-xs text-muted mt-1">
-            Last interaction {timeAgo(person.lastInteractedAt)}
-          </p>
-        </div>
-      </section>
-
-      {person.relationshipSummary && (
-        <section className="rounded-2xl bg-accent-soft p-4">
-          <h2 className="text-xs font-semibold text-accent uppercase tracking-wide mb-1.5">
-            Relationship
-          </h2>
-          <p className="text-sm leading-relaxed">{person.relationshipSummary}</p>
-        </section>
-      )}
-
+    <div className="flex flex-col gap-5">
       <section className="rounded-2xl border border-border bg-surface divide-y divide-border">
         {person.whatTheyDo && <Field label="What they do" value={person.whatTheyDo} />}
         {person.howWeMet && <Field label="How we met" value={person.howWeMet} />}
@@ -208,7 +216,7 @@ function ProfileView({ person }: { person: PersonFull }) {
               <div key={i.id} className="rounded-2xl border border-border bg-surface p-3.5">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-medium text-muted">
-                    {new Date(i.date).toLocaleDateString(undefined, {
+                    {new Date(i.date).toLocaleDateString("en-US", {
                       year: "numeric",
                       month: "short",
                       day: "numeric",
@@ -226,7 +234,7 @@ function ProfileView({ person }: { person: PersonFull }) {
           </div>
         )}
       </section>
-    </>
+    </div>
   );
 }
 
