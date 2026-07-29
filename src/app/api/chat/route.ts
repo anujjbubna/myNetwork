@@ -465,7 +465,10 @@ This app is only available to log information about people and ask follow up que
       const response = await trackedMessagesCreate(user.id, "chat", {
         model: CHAT_MODEL,
         max_tokens: 1500,
-        system,
+        // Cache the static prefix (tool definitions + system prompt + directory).
+        // It's re-sent identically on every turn of the agentic loop below and on
+        // rapid follow-up messages, so turns 2-8 read it at ~10% of input cost.
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
         tools: TOOLS,
         messages,
       });
